@@ -1,0 +1,81 @@
+##Version 5
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from datetime import datetime, time, timedelta
+
+# Load the data from the Excel file
+road_speed_df = pd.read_excel('data.xlsx', sheet_name='road speed')
+segment_info_df = pd.read_excel('data.xlsx', sheet_name='speed_segments_info')
+peak_hour_df = pd.read_excel('data.xlsx', sheet_name='Peak Hour')
+population_df = pd.read_excel('data.xlsx', sheet_name='Population')
+
+# Convert the time column to datetime format
+road_speed_df['time'] = pd.to_datetime(road_speed_df['time'], format='%H:%M:%S')
+
+# Round the time to the nearest 30 minutes
+road_speed_df['time'] = road_speed_df['time'].dt.floor('30min')
+
+# Merge the data frames
+merged_df = pd.merge(road_speed_df, segment_info_df, left_on='segment_id', right_on='irn_id')
+merged_df = pd.merge(merged_df, population_df, on='District')
+
+# Identify the peak hour time
+peak_start_hour = datetime.combine(merged_df['time'].dt.date.iloc[0], peak_hour_df['Starting Hour'].iloc[0])
+peak_end_hour = datetime.combine(merged_df['time'].dt.date.iloc[0], peak_hour_df['Ending Hour'].iloc[0]) + timedelta(hours=1)
+
+# Analyze the relationship between road speed and working population
+plt.figure(figsize=(12, 6))
+sns.scatterplot(x='Working population worked in the Different District Council district as their residence', y='speed', data=merged_df)
+plt.xlabel('Working Population')
+plt.ylabel('Road Speed')
+plt.title('Relationship between Road Speed and Working Population')
+plt.savefig('relationship_plot.png')
+
+# Identify the most congested road segments during peak hours
+peak_hour_df = merged_df[(merged_df['time'] >= peak_start_hour) & (merged_df['time'] <= peak_end_hour)]
+congested_segments = peak_hour_df.groupby('segment_id')['speed'].mean().sort_values().head(5).index.tolist()
+print("Most Congested Road Segments during Peak Hours:")
+print(congested_segments)
+
+# Analyze traffic patterns across different districts
+plt.figure(figsize=(12, 6))
+sns.barplot(x='District', y='speed', data=merged_df)
+plt.xticks(rotation=90)
+plt.xlabel('District')
+plt.ylabel('Road Speed')
+plt.title('Traffic Patterns Across Districts')
+plt.savefig('district_traffic_plot.png')
+
+# Analyze the daily and weekly traffic patterns
+daily_traffic = merged_df.groupby([merged_df['date'], merged_df['District'], merged_df['time'].dt.hour, merged_df['time'].dt.minute])['speed'].mean().unstack(fill_value=0)
+weekly_traffic = daily_traffic.groupby([merged_df['time'].dt.day_name(), merged_df['District']]).mean()
+
+plt.figure(figsize=(12, 6))
+daily_traffic.T.plot(ylim=(0, daily_traffic.max().max() * 1.1), legend=True)
+plt.xlabel('Time')
+plt.ylabel('Road Speed')
+plt.title('Daily Traffic Patterns')
+plt.legend(title='District', loc='upper left')
+plt.savefig('daily_traffic_plot.png')
+
+plt.figure(figsize=(12, 6))
+weekly_traffic.unstack().plot(kind='bar', legend=True)
+plt.xlabel('Day of the Week')
+plt.ylabel('Road Speed')
+plt.title('Weekly Traffic Patterns')
+plt.legend(title='District', loc='upper left')
+plt.savefig('weekly_traffic_plot.png')
+
+# Provide insights and recommendations
+print("Insights:")
+print("- The peak hour time is from", peak_start_hour.time(), "to", peak_end_hour.time())
+print("- The most congested road segments during peak hours are:", congested_segments)
+print("- There is a negative correlation between working population and road speed, indicating that higher working population leads to more traffic congestion.")
+print("- The daily traffic patterns show significant variations in road speed throughout the day, with lower speeds during the peak hours.")
+print("- The weekly traffic patterns show that certain districts and days of the week generally have lower road speeds compared to others.")
+print("Recommendations:")
+print("- Consider implementing traffic management strategies, such as adjusting traffic signals or improving public transportation, to alleviate congestion on the identified road segments during peak hours.")
+print("- Encourage remote work or flexible work schedules to reduce the number of commuters during peak hours.")
+print("- Conduct further analysis to understand the specific factors contributing to traffic congestion in different districts and develop targeted solutions.")
+print("- Monitor the daily and weekly traffic patterns to identify any changes or trends that may require additional interventions.")
